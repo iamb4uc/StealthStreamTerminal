@@ -5,19 +5,21 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "RobotoMono Nerd Font:pixelsize=13:antialias=true:autohint=true";
+static char *font = "RobotoMono Nerd Font:size=13:antialias=true:autohint=true";
 static int borderpx = 10;
 
 /*
  * What program is execed by st depends of these precedence rules:
  * 1: program passed with -e
- * 2: utmp option
+ * 2: scroll and/or utmp
  * 3: SHELL environment variable
  * 4: value of shell in /etc/passwd
  * 5: value of shell in config.h
  */
 static char *shell = "/bin/sh";
 char *utmp = NULL;
+/* scroll program: to enable use a string like "scroll" */
+char *scroll = NULL;
 char *stty_args = "stty raw pass8 nl -echo -iexten -cstopb 38400";
 
 /* identification sequence returned in DA and DECID */
@@ -30,9 +32,9 @@ static float chscale = 1.0;
 /*
  * word delimiter string
  *
- * More advanced example: " `'\"()[]{}"
+ * More advanced example: L" `'\"()[]{}"
  */
-char *worddelimiters = " ";
+wchar_t *worddelimiters = L" ";
 
 /* selection timeouts (in milliseconds) */
 static unsigned int doubleclicktimeout = 300;
@@ -41,9 +43,18 @@ static unsigned int tripleclicktimeout = 600;
 /* alt screens */
 int allowaltscreen = 1;
 
-/* frames per second st should at maximum draw to the screen */
-static unsigned int xfps = 120;
-static unsigned int actionfps = 30;
+/* allow certain non-interactive (insecure) window operations such as:
+   setting the clipboard text */
+int allowwindowops = 0;
+
+/*
+ * draw latency range in ms - from new content/keypress/etc until drawing.
+ * within this range, st draws when content stops arriving (idle). mostly it's
+ * near minlatency, but it waits longer for slow updates to avoid partial draw.
+ * low minlatency will tear/flicker more, as it can "detect" idle too early.
+ */
+static double minlatency = 8;
+static double maxlatency = 33;
 
 /*
  * blinking timeout (set to 0 to disable blinking) for the terminal blinking
@@ -83,46 +94,108 @@ char *termname = "st-256color";
 unsigned int tabspaces = 8;
 
 /* bg opacity */
-float alpha = 0.6;
+float alpha = 0.65;
 
-/* Terminal colors (16 first used in escape sequence) */
-static const char *colorname[] = {
-	/* 8 normal colors */
-	"black",
-	"red3",
-	"green3",
-	"yellow3",
-	"blue2",
-	"magenta3",
-	"cyan3",
-	"gray90",
+typedef struct {
+	const char* const colors[258]; /* terminal colors */
+	unsigned int fg;               /* foreground */
+	unsigned int bg;               /* background */
+	unsigned int cs;               /* cursor */
+	unsigned int rcs;              /* reverse cursor */
+} ColorScheme;
+/*
+ * Terminal colors (16 first used in escape sequence,
+ * 2 last for custom cursor color),
+ * foreground, background, cursor, reverse cursor
+ */
+static const ColorScheme schemes[] = {
+	// st (dark)
+	{{"black", "red3", "green3", "yellow3",
+	  "blue2", "magenta3", "cyan3", "gray90",
+	  "gray50", "red", "green", "yellow",
+	  "#5c5cff", "magenta", "cyan", "white",
+	  [256]="#cccccc", "#555555"}, 7, 0, 256, 257},
 
-	/* 8 bright colors */
-	"gray50",
-	"red",
-	"green",
-	"yellow",
-	"#5c5cff",
-	"magenta",
-	"cyan",
-	"white",
+	// Alacritty (dark)
+	{{"#1d1f21", "#cc6666", "#b5bd68", "#f0c674",
+	  "#81a2be", "#b294bb", "#8abeb7", "#c5c8c6",
+	  "#666666", "#d54e53", "#b9ca4a", "#e7c547",
+	  "#7aa6da", "#c397d8", "#70c0b1", "#eaeaea",
+	  [256]="#cccccc", "#555555"}, 7, 0, 256, 257},
 
-	[255] = 0,
+	// One Half dark
+	{{"#282c34", "#e06c75", "#98c379", "#e5c07b",
+	  "#61afef", "#c678dd", "#56b6c2", "#dcdfe4",
+	  "#282c34", "#e06c75", "#98c379", "#e5c07b",
+	  "#61afef", "#c678dd", "#56b6c2", "#dcdfe4",
+	  [256]="#cccccc", "#555555"}, 7, 0, 256, 257},
 
-	/* more colors can be added after 255 to use with DefaultXX */
-	"#cccccc",
-	"#555555",
+	// One Half light
+	{{"#fafafa", "#e45649", "#50a14f", "#c18401",
+      "#0184bc", "#a626a4", "#0997b3", "#383a42",
+	  "#fafafa", "#e45649", "#50a14f", "#c18401",
+	  "#0184bc", "#a626a4", "#0997b3", "#383a42",
+	  [256]="#cccccc", "#555555"}, 7, 0, 256, 257},
+
+	// Solarized dark
+	{{"#073642", "#dc322f", "#859900", "#b58900",
+	  "#268bd2", "#d33682", "#2aa198", "#eee8d5",
+	  "#002b36", "#cb4b16", "#586e75", "#657b83",
+	  "#839496", "#6c71c4", "#93a1a1", "#fdf6e3",
+	  [256]="#93a1a1", "#fdf6e3"}, 12, 8, 256, 257},
+
+	// Solarized light
+	{{"#eee8d5", "#dc322f", "#859900", "#b58900",
+	  "#268bd2", "#d33682", "#2aa198", "#073642",
+	  "#fdf6e3", "#cb4b16", "#93a1a1", "#839496",
+	  "#657b83", "#6c71c4", "#586e75", "#002b36",
+	  [256]="#586e75", "#002b36"}, 12, 8, 256, 257},
+
+	// Gruvbox dark
+	{{"#282828", "#cc241d", "#98971a", "#d79921",
+	  "#458588", "#b16286", "#689d6a", "#a89984",
+	  "#928374", "#fb4934", "#b8bb26", "#fabd2f",
+	  "#83a598", "#d3869b", "#8ec07c", "#ebdbb2",
+	  [256]="#ebdbb2", "#555555"}, 15, 0, 256, 257},
+
+	// Gruvbox light
+	{{"#fbf1c7", "#cc241d", "#98971a", "#d79921",
+	  "#458588", "#b16286", "#689d6a", "#7c6f64",
+	  "#928374", "#9d0006", "#79740e", "#b57614",
+	  "#076678", "#8f3f71", "#427b58", "#3c3836",
+	  [256]="#3c3836", "#555555"}, 15, 0, 256, 257},
+	
+  // Carbon Dark
+	{{"#161616", "#ee5396", "#42be65", "#be95ff",
+    "#3ddbd9", "#ff7eb6", "#08bdba", "#525252",
+    "#262626", "#78a9ff", "#82cfff", "#f2f4f8",
+    "#33b1ff", "#393939", "#dde1e6", "#ffffff",
+    [256]="#ffffff", "#525252"}, 15, 0, 256, 257},
+  // Carbon Dark
+	{{"#FFFFFF", "#FAFAFA", "#ECEFF1", "#161616", 
+    "#37474F", "#90A4AE", "#525252", "#08bdba",
+    "#ff7eb6", "#ee5396", "#FF6F00", "#0f62fe", 
+    "#673AB7", "#42be65", "#be95ff", "#FFAB91",
+    [256]="#161616", "#525252"}, 3, 0, 256, 257},
+  // Treefox
+  {{"#0f1c1e", "#c54e45", "#688b89", "#d78b6c",
+	  "#4d7d90", "#ad6771", "#4d7d90", "#2d4f56",
+	  "#1d3337", "#eb746b", "#8eb2af", "#fdb292",
+	  "#7aa4a1", "#b97490", "#afd4de", "#e6eaea",
+	  [256]="#425e5e", "#e6eaea"}, 15, 0, 256, 257},
 };
 
+static const char * const * colorname;
+int colorscheme = 0;
 
 /*
  * Default colors (colorname index)
  * foreground, background, cursor, reverse cursor
  */
-unsigned int defaultfg = 7;
-unsigned int defaultbg = 0;
-static unsigned int defaultcs = 256;
-static unsigned int defaultrcs = 257;
+unsigned int defaultfg;
+unsigned int defaultbg;
+unsigned int defaultcs;
+static unsigned int defaultrcs;
 
 /*
  * Default shape of cursor
@@ -154,13 +227,25 @@ static unsigned int mousebg = 0;
 static unsigned int defaultattr = 11;
 
 /*
+ * Force mouse select/shortcuts while mask is active (when MODE_MOUSE is set).
+ * Note that if you want to use ShiftMask with selmasks, set this to an other
+ * modifier, set to 0 to not use it.
+ */
+static uint forcemousemod = ShiftMask;
+
+/*
  * Internal mouse shortcuts.
  * Beware that overloading Button1 will disable the selection.
  */
 static MouseShortcut mshortcuts[] = {
-	/* button               mask            string */
-	{ Button4,              XK_ANY_MOD,     "\031" },
-	{ Button5,              XK_ANY_MOD,     "\005" },
+	/* mask                 button   function        argument       release */
+	{ ShiftMask,            Button4, kscrollup,      {.i = 1} },
+	{ ShiftMask,            Button5, kscrolldown,    {.i = 1} },
+	{ XK_ANY_MOD,           Button2, selpaste,       {.i = 0},      1 },
+	{ ShiftMask,            Button4, ttysend,        {.s = "\033[5;2~"} },
+	{ XK_ANY_MOD,           Button4, ttysend,        {.s = "\031"} },
+	{ ShiftMask,            Button5, ttysend,        {.s = "\033[6;2~"} },
+	{ XK_ANY_MOD,           Button5, ttysend,        {.s = "\005"} },
 };
 
 /* Internal keyboard shortcuts. */
@@ -179,8 +264,21 @@ static Shortcut shortcuts[] = {
 	{ TERMMOD,              XK_C,           clipcopy,       {.i =  0} },
 	{ TERMMOD,              XK_V,           clippaste,      {.i =  0} },
 	{ TERMMOD,              XK_Y,           selpaste,       {.i =  0} },
+	{ ShiftMask,            XK_Insert,      selpaste,       {.i =  0} },
 	{ TERMMOD,              XK_Num_Lock,    numlock,        {.i =  0} },
-	{ TERMMOD,              XK_I,           iso14755,       {.i =  0} },
+	{ MODKEY,               XK_1,           selectscheme,   {.i =  0} },
+	{ MODKEY,               XK_2,           selectscheme,   {.i =  1} },
+	{ MODKEY,               XK_3,           selectscheme,   {.i =  2} },
+	{ MODKEY,               XK_4,           selectscheme,   {.i =  3} },
+	{ MODKEY,               XK_5,           selectscheme,   {.i =  4} },
+	{ MODKEY,               XK_6,           selectscheme,   {.i =  5} },
+	{ MODKEY,               XK_7,           selectscheme,   {.i =  6} },
+	{ MODKEY,               XK_8,           selectscheme,   {.i =  7} },
+	{ MODKEY,               XK_9,           selectscheme,   {.i =  8} },
+	{ MODKEY,               XK_0,           nextscheme,     {.i = +1} },
+	{ MODKEY|ControlMask,   XK_0,           nextscheme,     {.i = -1} },
+	{ ShiftMask,            XK_Page_Up,     kscrollup,      {.i = -1} },
+	{ ShiftMask,            XK_Page_Down,   kscrolldown,    {.i = -1} },
 };
 
 /*
@@ -198,10 +296,6 @@ static Shortcut shortcuts[] = {
  * * 0: no value
  * * > 0: cursor application mode enabled
  * * < 0: cursor application mode disabled
- * crlf value
- * * 0: no value
- * * > 0: crlf mode is enabled
- * * < 0: crlf mode is disabled
  *
  * Be careful with the order of the definitions because st searches in
  * this table sequentially, so any XK_ANY_MOD must be in the last
@@ -219,13 +313,6 @@ static KeySym mappedkeys[] = { -1 };
  * numlock (Mod2Mask) and keyboard layout (XK_SWITCH_MOD) are ignored.
  */
 static uint ignoremod = Mod2Mask|XK_SWITCH_MOD;
-
-/*
- * Override mouse-select while mask is active (when MODE_MOUSE is set).
- * Note that if you want to use ShiftMask with selmasks, set this to an other
- * modifier, set to 0 to not use it.
- */
-static uint forceselmod = ShiftMask;
 
 /*
  * This is the huge key array which defines all compatibility to the Linux
