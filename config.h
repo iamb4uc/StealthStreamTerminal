@@ -5,8 +5,8 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "RobotoMono Nerd Font:size=13:antialias=true:autohint=true";
-static int borderpx = 10;
+static char *font = "JetbrainsMono Nerd Font:size=10:antialias=true:autohint=true";
+static int borderpx = 4;
 
 /*
  * What program is execed by st depends of these precedence rules:
@@ -94,7 +94,7 @@ char *termname = "st-256color";
 unsigned int tabspaces = 8;
 
 /* bg opacity */
-float alpha = 0.85;
+float alpha = 0.8;
 
 typedef struct {
 	const char* const colors[258]; /* terminal colors */
@@ -164,7 +164,7 @@ static const ColorScheme schemes[] = {
 	  "#928374", "#9d0006", "#79740e", "#b57614",
 	  "#076678", "#8f3f71", "#427b58", "#3c3836",
 	  [256]="#3c3836", "#555555"}, 15, 0, 256, 257},
-	
+
   // Carbon Dark
 	{{"#161616", "#ee5396", "#42be65", "#be95ff",
     "#3ddbd9", "#ff7eb6", "#08bdba", "#525252",
@@ -172,9 +172,9 @@ static const ColorScheme schemes[] = {
     "#33b1ff", "#393939", "#dde1e6", "#ffffff",
     [256]="#ffffff", "#525252"}, 15, 0, 256, 257},
   // Carbon Dark
-	{{"#FFFFFF", "#FAFAFA", "#ECEFF1", "#161616", 
+	{{"#FFFFFF", "#FAFAFA", "#ECEFF1", "#161616",
     "#37474F", "#90A4AE", "#525252", "#08bdba",
-    "#ff7eb6", "#ee5396", "#FF6F00", "#0f62fe", 
+    "#ff7eb6", "#ee5396", "#FF6F00", "#0f62fe",
     "#673AB7", "#42be65", "#be95ff", "#FFAB91",
     [256]="#161616", "#525252"}, 3, 0, 256, 257},
   // Treefox
@@ -186,7 +186,7 @@ static const ColorScheme schemes[] = {
 };
 
 static const char * const * colorname;
-int colorscheme = 6;
+int colorscheme = 0;
 
 /*
  * Default colors (colorname index)
@@ -550,3 +550,4 @@ static char ascii_printable[] =
 	" !\"#$%&'()*+,-./0123456789:;<=>?"
 	"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 	"`abcdefghijklmnopqrstuvwxyz{|}~";
+
