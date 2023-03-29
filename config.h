@@ -5,7 +5,7 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "monospace:size=9:antialias=true";
+static char *font = "monospace:size=11:antialias=true";
 static int borderpx = 4;
 
 /*
@@ -94,7 +94,7 @@ char *termname = "st-256color";
 unsigned int tabspaces = 8;
 
 /* bg opacity */
-float alpha = 0.6;
+float alpha = 0.9;
 
 typedef struct {
 	const char* const colors[258]; /* terminal colors */
