@@ -5,7 +5,7 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "monospace:size=9:antialias=true";
+static char *font = "JetBrainsMono Nerd Font:size=13:antialias=true";
 static int borderpx = 10;
 
 /*
@@ -91,10 +91,10 @@ char *termname = "st-256color";
  *
  *	stty tabs
  */
-unsigned int tabspaces = 8;
+unsigned int tabspaces = 4;
 
 /* bg opacity */
-float alpha = 0.97;
+float alpha = 1.0;
 
 typedef struct {
   const char *const colors[258]; /* terminal colors */
