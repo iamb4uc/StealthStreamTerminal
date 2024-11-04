@@ -6,7 +6,7 @@
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
 static char *font = "JetBrainsMono Nerd Font:size=13:antialias=true";
-static int borderpx = 10;
+static int borderpx = 20;
 
 /*
  * What program is execed by st depends of these precedence rules:
@@ -60,7 +60,7 @@ static double maxlatency = 33;
  * blinking timeout (set to 0 to disable blinking) for the terminal blinking
  * attribute.
  */
-static unsigned int blinktimeout = 100;
+static unsigned int blinktimeout = 0;
 
 /*
  * thickness of underline and bar cursors
